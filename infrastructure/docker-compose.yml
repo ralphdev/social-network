@@ -1,0 +1,71 @@
+services:
+
+  postgres:
+    image: postgres:alpine3.22
+    container_name: social-network-db
+    environment:
+      POSTGRES_USER: social_user
+      POSTGRES_PASSWORD: secure_password
+      POSTGRES_DB: social_network
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - social-network-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: social-network-api
+    environment:
+      NODE_ENV: development
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: social_user
+      DB_PASSWORD: secure_password
+      DB_NAME: social_network
+      JWT_SECRET: dev-secret-change-in-production
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../backend:/app
+      - /app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - social-network-net
+    command: npm run start:dev
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: social-network-frontend
+    environment:
+      NODE_ENV: development
+    ports:
+      - "4200:4200"
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+      - /app/.angular
+    networks:
+      - social-network-net
+    command: npm start -- --host 0.0.0.0 --poll 2000
+
+
+volumes:
+  pgdata:
+
+networks:
+  social-network-net:
+    driver: bridge
